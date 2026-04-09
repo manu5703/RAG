@@ -1,0 +1,21 @@
+services:
+  rag-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - hf-cache:/root/.cache/huggingface   # persist model weights across restarts
+      - ./eval:/app/eval                     # persist scores.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s   # allow time for model loading
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

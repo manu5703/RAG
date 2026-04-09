@@ -1,0 +1,54 @@
+name: RAG Evaluation CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Cache pip wheels so repeated runs don't re-download everything
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
+
+      # Cache HuggingFace model weights — Qwen download is ~1 GB
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('requirements.txt') }}
+          restore-keys: hf-
+
+      - name: Install dependencies
+        run: pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Run RAGAS evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          HF_HOME: ~/.cache/huggingface
+        run: python -m eval.evaluate
+
+      - name: Upload scores artifact
+        if: always()   # upload even on failure so we can diff regressions
+        uses: actions/upload-artifact@v4
+        with:
+          name: ragas-scores
+          path: eval/scores.json
+          retention-days: 90
