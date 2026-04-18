@@ -1,4 +1,4 @@
-# ── Stage 1: dependency layer (cached separately from app code) ────────────────
+# Stage 1: dependency layer
 FROM python:3.10-slim AS deps
 
 WORKDIR /build
@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 
-# ── Stage 2: runtime image ─────────────────────────────────────────────────────
+# Stage 2: runtime image
 FROM python:3.10-slim AS runtime
 
 WORKDIR /app
