@@ -1,5 +1,4 @@
 """
-Streamlit UI — PDF upload → RAG query + interpretability graphs.
 Run: streamlit run streamlit_app.py
 """
 
@@ -18,7 +17,7 @@ from interpretability.faithfulness import (
     detect_context_dropout,
 )
 
-# ─── Page config ──────────────────────────────────────────────────────────────
+# Page config 
 
 st.set_page_config(
     page_title="RAG + Faithfulness",
@@ -26,7 +25,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# ─── Load models once — index is rebuilt separately when PDF changes ──────────
+# Load models once — index is rebuilt separately when PDF changes 
 
 SAMPLE_CHUNKS = [
     "The Eiffel Tower is located in Paris, France.",
@@ -44,8 +43,7 @@ def load_pipeline():
 
 pipeline = load_pipeline()
 
-# ─── Sidebar — PDF upload ─────────────────────────────────────────────────────
-
+# Sidebar — PDF upload 
 with st.sidebar:
     st.title("Document")
 
@@ -110,14 +108,12 @@ with st.sidebar:
     st.caption(f"Top-K rerank: **{settings.top_k_rerank}**")
     st.caption(f"Dense weight α: **{settings.alpha}**")
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────
+# Tabs 
 
 tab_query, tab_interp = st.tabs(["💬 Query", "🔬 Interpretability"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Query
-# ══════════════════════════════════════════════════════════════════════════════
 
 with tab_query:
     doc_label = (
@@ -165,9 +161,7 @@ with tab_query:
         st.info("Switch to the **Interpretability** tab to analyse this answer.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — Interpretability
-# ══════════════════════════════════════════════════════════════════════════════
 
 with tab_interp:
     st.header("Faithfulness Interpretability")
@@ -218,7 +212,7 @@ with tab_interp:
 
         diagnosis = detect_context_dropout(ll_result)
 
-        # ── Diagnosis banner ──────────────────────────────────────
+        # Diagnosis banner 
         st.divider()
         d1, d2, d3 = st.columns(3)
         d1.metric("Peak grounding layer", diagnosis["peak_grounding_layer"])
@@ -235,7 +229,7 @@ with tab_interp:
 
         st.divider()
 
-        # ── Logit Lens ────────────────────────────────────────────
+        # Logit Lens 
         st.subheader("Logit Lens — P(target token) per layer")
         st.caption(
             "A peak early and sustained → context-grounded. "
@@ -275,7 +269,7 @@ with tab_interp:
         )
         st.plotly_chart(fig_ll, use_container_width=True)
 
-        # ── DLA ───────────────────────────────────────────────────
+        # DLA 
         st.subheader("Direct Logit Attribution — per-layer contribution")
         st.caption(
             "Positive bars → component writes the answer. "
@@ -320,7 +314,7 @@ with tab_interp:
         )
         st.plotly_chart(fig_dla, use_container_width=True)
 
-        # ── Raw numbers ───────────────────────────────────────────
+        # Raw numbers
         with st.expander("Raw numbers"):
             df = pd.DataFrame({
                 "Layer":         x,
