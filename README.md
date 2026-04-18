@@ -3,6 +3,12 @@
 Hybrid retrieval (dense + BM25) → cross-encoder reranking → Qwen generation,
 with RAGAS evaluation CI and logit lens / DLA interpretability.
 
+
+<img width="1919" height="867" alt="Screenshot 2026-04-08 202752" src="https://github.com/user-attachments/assets/8502c3cd-6ffe-4614-a53e-a3d6bef4b593" />
+<img width="1919" height="794" alt="Screenshot 2026-04-08 202942" src="https://github.com/user-attachments/assets/eadbb428-8b22-4f31-9e0a-4fce3a4cf9e6" />
+<img width="1448" height="814" alt="Screenshot 2026-04-08 203016" src="https://github.com/user-attachments/assets/d80b5845-923b-4aa7-b0df-1fc2ad3b2968" />
+<img width="1446" height="808" alt="Screenshot 2026-04-08 203041" src="https://github.com/user-attachments/assets/1768e4b2-93bb-4685-a6f6-4b9e1c9fd1c5" />
+
 ## Project Structure
 
 ```
