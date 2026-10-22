@@ -31,7 +31,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "Qwen/Qwen1.5-0.5B-Chat"
+_DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 
 # ─── Model loader ─────────────────────────────────────────────────────────────
@@ -125,17 +125,24 @@ def direct_logit_attribution(
     dla_attn  = []
     dla_mlp   = []
 
+    # Rotary position embeddings are computed once at the model level in
+    # transformers >= 4.45 and passed to every attention block.
+    seq_len      = inputs["input_ids"].shape[-1]
+    position_ids = torch.arange(seq_len, device=hidden_states[0].device)[None, :]
+    rotary       = getattr(model.model, "rotary_emb", None)
+
     with torch.no_grad():
         for layer_idx, layer in enumerate(layers):
             h_in = hidden_states[layer_idx]   # (1, seq_len, hidden)
 
             # ── Attention contribution ────────────────────────────
-            # Pre-norm: apply input_layernorm before self_attn
+            # Pre-norm: apply input_layernorm before self_attn.
+            # attention_mask=None -> SDPA applies a causal mask itself.
             normed_attn = layer.input_layernorm(h_in)
-            attn_out    = layer.self_attn(
-                hidden_states=normed_attn,
-                attention_mask=None,
-            )[0]                               # (1, seq_len, hidden)
+            attn_kwargs = dict(hidden_states=normed_attn, attention_mask=None, position_ids=position_ids)
+            if rotary is not None:
+                attn_kwargs["position_embeddings"] = rotary(normed_attn, position_ids)
+            attn_out    = layer.self_attn(**attn_kwargs)[0]   # (1, seq_len, hidden)
             attn_contrib = attn_out[0, -1, :] # (hidden,)
             dla_attn.append(torch.dot(attn_contrib, target_dir).item())
 

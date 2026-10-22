@@ -1,0 +1,7 @@
+{
+  "_note": "CI fails a pull request when a metric drops below these. Starting values are conservative; after your first full run, set each to your measured score minus about 0.05.",
+  "retrieval": {
+    "bm25": {"recall@5": 0.50},
+    "hybrid_rerank": {"recall@5": 0.60, "mrr@10": 0.45}
+  }
+}

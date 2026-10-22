@@ -10,3 +10,5 @@ __pycache__
 *.png
 eval/scores.json
 README.md
+corpus/raw
+tests

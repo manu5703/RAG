@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.pytest_cache/
+# crawled HTML cache; corpus/chunks.jsonl and pages.jsonl are committed as a dated snapshot
+corpus/raw/
+# per-run outputs; commit eval/results/*.md when you want results in the README
+eval/results/*.jsonl
+*.png

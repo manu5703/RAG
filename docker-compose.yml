@@ -4,17 +4,20 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Point at a vLLM / OpenAI-compatible server instead of running the model in-process:
+      - LLM_BACKEND=${LLM_BACKEND:-hf}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-1.5B-Instruct}
     volumes:
-      - hf-cache:/root/.cache/huggingface   # persist model weights across restarts
-      - ./eval:/app/eval                     # persist scores.json
+      - hf-cache:/home/appuser/.cache/huggingface   # persist model weights across restarts
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # python-slim has no curl; use the interpreter that's already there
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s   # allow time for model loading
+      start_period: 120s   # allow time for model loading
     restart: unless-stopped
 
 volumes:
