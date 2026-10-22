@@ -4,6 +4,7 @@ FROM python:3.10-slim AS deps
 WORKDIR /build
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir -r requirements.txt
 
 
@@ -12,18 +13,20 @@ FROM python:3.10-slim AS runtime
 
 WORKDIR /app
 
-# Copy installed packages from the deps stage
 COPY --from=deps /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
-# Copy application source (respects .dockerignore)
-COPY app/         ./app/
+# Application source and the crawled corpus snapshot (respects .dockerignore)
+COPY app/              ./app/
 COPY interpretability/ ./interpretability/
+COPY ingest/           ./ingest/
+COPY corpus/           ./corpus/
 
 EXPOSE 8000
 
-# Non-root user for security
-RUN adduser --disabled-password --gecos "" appuser
+# Non-root user; model weights cache in its home (mounted as a volume in compose)
+RUN adduser --disabled-password --gecos "" appuser && mkdir -p /home/appuser/.cache && chown -R appuser /home/appuser
 USER appuser
+ENV HF_HOME=/home/appuser/.cache/huggingface
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

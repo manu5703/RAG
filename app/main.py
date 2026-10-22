@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.rag_pipeline import RAGPipeline
+from app.schema import read_chunks
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +26,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ─── Sample corpus — replace with your document loader ────────────────────────
+# ─── Corpus ───────────────────────────────────────────────────────────────────
+# Built by `python -m ingest.crawl`. Falls back to a tiny sample so the API
+# still starts on a fresh checkout.
 
 SAMPLE_CHUNKS = [
     "The Eiffel Tower is located in Paris, France.",
@@ -43,7 +47,14 @@ pipeline: Optional[RAGPipeline] = None
 async def lifespan(app: FastAPI):
     global pipeline
     logger.info("Initialising RAG pipeline …")
-    pipeline = RAGPipeline(chunks=SAMPLE_CHUNKS)
+    if Path(settings.corpus_path).exists():
+        chunks = read_chunks(settings.corpus_path)
+        logger.info("Loaded %d chunks from %s", len(chunks), settings.corpus_path)
+    else:
+        logger.warning("%s not found; using the 5-line sample corpus. Run `python -m ingest.crawl`.",
+                       settings.corpus_path)
+        chunks = SAMPLE_CHUNKS
+    pipeline = RAGPipeline(chunks=chunks)
     logger.info("Pipeline ready.")
     yield
     logger.info("Shutting down.")
@@ -52,10 +63,10 @@ async def lifespan(app: FastAPI):
 # ─── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="RAG Pipeline API",
-    description="Hybrid retrieval + cross-encoder reranking + Qwen generation "
-                "with logit-lens / DLA faithfulness analysis.",
-    version="1.0.0",
+    title="Campus RAG Assistant API",
+    description="Answers University of Utah student questions (ISSS, Registrar, CHPC) "
+                "with cited sources. Hybrid retrieval + cross-encoder reranking + Qwen.",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -83,14 +94,25 @@ async def add_request_timing(request: Request, call_next):
 class QueryRequest(BaseModel):
     question: str
 
-    model_config = {"json_schema_extra": {"example": {"question": "Where is the Eiffel Tower?"}}}
+    model_config = {"json_schema_extra": {"example": {"question": "How many days of unemployment are allowed on OPT?"}}}
+
+
+class Source(BaseModel):
+    n:       int
+    url:     str
+    title:   str
+    section: str
+    cited:   bool
 
 
 class QueryResponse(BaseModel):
     question:     str
     answer:       str
+    abstained:    bool
+    sources:      list[Source]
     context_used: list[str]
     latency_ms:   float
+    timings_ms:   dict[str, float]
 
 
 class InterpretRequest(BaseModel):
@@ -125,6 +147,7 @@ def query(req: QueryRequest):
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     result = pipeline.query(req.question)
+    result.pop("_gen", None)
     return QueryResponse(**result)
 
 
@@ -140,6 +163,8 @@ def interpretability(req: InterpretRequest):
         logit_lens,
     )
 
+    if not hasattr(pipeline.llm, "tokenizer"):
+        raise HTTPException(status_code=400, detail="Interpretability needs LLM_BACKEND=hf (in-process model).")
     tokenizer = pipeline.llm.tokenizer
     model     = pipeline.llm.model
 

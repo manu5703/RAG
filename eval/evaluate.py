@@ -1,9 +1,11 @@
 """
-RAGAS Evaluation — runs on a golden Q&A dataset and fails CI if any score
-drops below its threshold.
+Optional RAGAS evaluation (LLM-as-judge) on the campus question set.
+Exits 1 if any score drops below its threshold.
+
+The primary evals are eval.retrieval_eval (runs in CI) and eval.answer_eval
+(key-fact scoring, no judge model needed). Use this one for a second opinion.
 
 Usage:
-    python -m eval.evaluate          # from repo root
     OPENAI_API_KEY=sk-... python -m eval.evaluate
 """
 
@@ -21,7 +23,10 @@ from ragas.metrics import (
     faithfulness,
 )
 
+from app.config import settings
 from app.rag_pipeline import RAGPipeline
+from app.schema import read_chunks
+from eval.scoring import load_qa
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -35,54 +40,28 @@ THRESHOLDS = {
     "context_recall":    0.60,
 }
 
-# ─── Golden dataset ───────────────────────────────────────────────────────────
-# Expand this with GPT-4-generated pairs over your real corpus.
+# ─── Dataset ──────────────────────────────────────────────────────────────────
+# The same campus question set the other evals use; RAGAS scores the
+# answerable questions (it has no notion of a correct abstention).
 
-GOLDEN = [
-    {
-        "question":       "Where is the Eiffel Tower?",
-        "ground_truth":   "The Eiffel Tower is in Paris, France.",
-        "reference_context": "The Eiffel Tower is located in Paris, France.",
-    },
-    {
-        "question":       "What is RAG?",
-        "ground_truth":   "RAG combines retrieval systems with generative language models.",
-        "reference_context": "RAG combines retrieval systems with generative language models.",
-    },
-    {
-        "question":       "What is Python used for?",
-        "ground_truth":   "Python is widely used for data science and ML development.",
-        "reference_context": "Python is widely used for data science and ML development.",
-    },
-    {
-        "question":       "What is machine learning?",
-        "ground_truth":   "Machine learning is a subset of artificial intelligence.",
-        "reference_context": "Machine learning is a subset of artificial intelligence.",
-    },
-    {
-        "question":       "What do Docker containers do?",
-        "ground_truth":   "Docker containers package code and dependencies together.",
-        "reference_context": "Docker containers package code and dependencies together.",
-    },
-]
-
-CHUNKS = [g["reference_context"] for g in GOLDEN]
+QA_PATH = "eval/data/campus_qa.jsonl"
 
 
 # ─── Evaluation runner ────────────────────────────────────────────────────────
 
 def run_eval() -> bool:
     """Run the full evaluation. Returns True if all thresholds pass."""
-    pipeline = RAGPipeline(chunks=CHUNKS)
+    pipeline = RAGPipeline(chunks=read_chunks(settings.corpus_path))
+    golden = [i for i in load_qa(QA_PATH) if i["answerable"]]
 
     questions, answers, contexts, ground_truths = [], [], [], []
 
-    for item in GOLDEN:
+    for item in golden:
         result = pipeline.query(item["question"])
         questions.append(item["question"])
         answers.append(result["answer"])
         contexts.append(result["context_used"])
-        ground_truths.append(item["ground_truth"])
+        ground_truths.append(item["answer"])
         logger.info("Q: %s → A: %s", item["question"], result["answer"][:80])
 
     dataset = Dataset.from_dict(
@@ -110,7 +89,7 @@ def run_eval() -> bool:
             failed = True
 
     # ── Persist for CI artifact ───────────────────────────────────
-    scores_dir = Path("eval")
+    scores_dir = Path("eval/results")
     scores_dir.mkdir(exist_ok=True)
     scores_path = scores_dir / "scores.json"
     scores_path.write_text(

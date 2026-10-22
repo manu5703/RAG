@@ -1,0 +1,11 @@
+# Unit tests only: no torch or model downloads (see tests/conftest.py fakes).
+numpy==1.26.4
+rank-bm25==0.2.2
+faiss-cpu==1.8.0
+scikit-learn==1.5.2
+beautifulsoup4==4.12.3
+requests==2.32.3
+pyyaml==6.0.2
+pydantic==2.6.4
+pydantic-settings==2.2.1
+pytest==8.3.3

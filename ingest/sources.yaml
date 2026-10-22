@@ -1,0 +1,37 @@
+# Pages the campus assistant indexes. Every answer cites one of these URLs.
+# Add a page here, re-run `python -m ingest.crawl`, and the index picks it up.
+#
+# follow_links: also crawl same-site links whose URL starts with one of
+# `allow_prefixes` (one hop from the seed page).
+
+sites:
+  - name: International Student & Scholar Services
+    seeds:
+      - https://ic.utah.edu/current-students/students-f1-and-j1/f-1-students/employment/off-campus-employment/curricular-practical-training/index.php
+      - https://ic.utah.edu/current-students/students-f1-and-j1/f-1-students/employment/work-after-graduation/post-opt/index.php
+      - https://isss.utah.edu/news/posts/2025/cpt-requirement-update.php
+    follow_links: true
+    allow_prefixes:
+      - https://ic.utah.edu/current-students/students-f1-and-j1/f-1-students/
+
+  - name: Office of the Registrar
+    seeds:
+      - https://registrar.utah.edu/handbook/graduategraduation.php
+    follow_links: false
+
+  - name: Center for High Performance Computing
+    seeds:
+      - https://chpc.utah.edu/documentation/gettingstarted.php
+      - https://chpc.utah.edu/documentation/software/slurm.php
+      - https://chpc.utah.edu/documentation/guides/gpus-accelerators.php
+      - https://chpc.utah.edu/resources/storage_services.php
+      - https://chpc.utah.edu/userservices/accounts.php
+      - https://chpc.utah.edu/userservices/allocations.php
+      - https://chpc.utah.edu/documentation/hpcfaq.php
+      - https://chpc.utah.edu/documentation/software/ondemand.php
+      - https://chpc.utah.edu/documentation/software/modules.php
+      - https://chpc.utah.edu/documentation/software/codingagents.php
+      - https://chpc.utah.edu/documentation/data_services.php
+    follow_links: true
+    allow_prefixes:
+      - https://chpc.utah.edu/documentation/

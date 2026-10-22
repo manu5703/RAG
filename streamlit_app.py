@@ -36,9 +36,19 @@ SAMPLE_CHUNKS = [
 ]
 
 
+def default_corpus():
+    """The crawled campus corpus if it exists, else the 5-line sample."""
+    from pathlib import Path
+    from app.schema import read_chunks
+
+    if Path(settings.corpus_path).exists():
+        return read_chunks(settings.corpus_path)
+    return SAMPLE_CHUNKS
+
+
 @st.cache_resource(show_spinner="Loading models — this takes a minute on first run…")
 def load_pipeline():
-    return RAGPipeline(chunks=SAMPLE_CHUNKS)
+    return RAGPipeline(chunks=default_corpus())
 
 
 pipeline = load_pipeline()
@@ -65,7 +75,7 @@ with st.sidebar:
                 st.error("Could not extract text from this PDF.")
             else:
                 with st.spinner(f"Indexing {len(chunks)} chunks…"):
-                    pipeline.index.build(chunks)
+                    pipeline.rebuild(chunks)
 
                 st.session_state["loaded_file_key"] = file_key
                 st.session_state["chunk_count"]     = len(chunks)
@@ -92,7 +102,7 @@ with st.sidebar:
         if st.session_state.get("loaded_file_key"):
             # User removed the file — reset to sample chunks
             with st.spinner("Resetting to sample corpus…"):
-                pipeline.index.build(SAMPLE_CHUNKS)
+                pipeline.rebuild(default_corpus())
             st.session_state.pop("loaded_file_key", None)
             st.session_state.pop("chunk_count", None)
             st.session_state.pop("doc_name", None)
@@ -137,7 +147,17 @@ with tab_query:
             result = pipeline.query(question)
 
         st.success(f"**Answer:** {result['answer']}")
-        st.caption(f"Latency: {result['latency_ms']} ms")
+        cited = [s for s in result["sources"] if s["cited"] and s["url"]]
+        if cited:
+            st.markdown("**Sources:** " + " · ".join(
+                f"[{s['n']}] [{s['section'] or s['title'] or s['url']}]({s['url']})" for s in cited
+            ))
+        t = result["timings_ms"]
+        st.caption(
+            f"Latency: {result['latency_ms']:.0f} ms "
+            f"(retrieve {t.get('retrieve_ms', 0):.0f} · rerank {t.get('rerank_ms', 0):.0f} · "
+            f"generate {t.get('generate_ms', 0):.0f})"
+        )
 
         # Build the interpretability prompt from this result and save to session
         context_block = "\n\n".join(

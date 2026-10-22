@@ -8,7 +8,7 @@ import io
 import logging
 from typing import Generator, List
 
-import pypdf
+from app.schema import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ def extract_text_from_pdf(file: io.BytesIO, max_chars: int = MAX_CHARS):
     Extract text page by page, stopping once `max_chars` is reached.
     Returns (text, was_truncated).
     """
+    import pypdf  # only the PDF upload path needs it
+
     reader    = pypdf.PdfReader(file)
     pages     = []
     total     = 0
@@ -98,6 +100,46 @@ def chunk_text(
     overlap: int = CHUNK_OVERLAP,
 ) -> List[str]:
     return list(iter_chunks(text, chunk_size=chunk_size, overlap=overlap))
+
+
+# ─── Section-aware chunking for web pages ─────────────────────────────────────
+
+MIN_SECTION_CHARS = 200   # merge tiny sections into the next so chunks aren't one-liners
+
+
+def chunk_sections(
+    sections,
+    url: str,
+    title: str,
+    chunk_size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP,
+) -> List[Chunk]:
+    """
+    Chunk a page section by section. Chunks never span two headings, and each
+    one keeps its page URL, page title and section heading for citations.
+    `sections` is any iterable of objects with `.heading` and `.text`.
+    """
+    merged: List[tuple[str, str]] = []
+    pending_heading, pending_text = None, ""
+    for s in sections:
+        if pending_heading is None:
+            pending_heading, pending_text = s.heading, s.text
+        elif len(pending_text) < MIN_SECTION_CHARS:
+            heading = pending_heading or s.heading
+            if pending_heading and s.heading:
+                heading = f"{pending_heading} / {s.heading}"
+            pending_heading, pending_text = heading, f"{pending_text}\n{s.text}".strip()
+        else:
+            merged.append((pending_heading, pending_text))
+            pending_heading, pending_text = s.heading, s.text
+    if pending_heading is not None and pending_text.strip():
+        merged.append((pending_heading, pending_text))
+
+    out: List[Chunk] = []
+    for heading, text in merged:
+        for piece in iter_chunks(text, chunk_size=chunk_size, overlap=overlap):
+            out.append(Chunk(text=piece, url=url, title=title, section=heading))
+    return out
 
 
 # ─── Combined loader ──────────────────────────────────────────────────────────
